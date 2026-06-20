@@ -3,8 +3,14 @@ import path from "path";
 import fs from "fs/promises";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
+import { initializeApp } from "firebase/app";
+import { getFirestore, collection, doc, getDoc, setDoc, getDocs } from "firebase/firestore";
+import firebaseConfig from "./firebase-applet-config.json";
 
 dotenv.config();
+
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId);
 
 interface SurveyResponse {
   id: string;
@@ -34,19 +40,81 @@ interface AppConfig {
 const DATA_FILE = path.join(process.cwd(), "responses.json");
 const CONFIG_FILE = path.join(process.cwd(), "config.json");
 
-// Helper to initialize or load files
+// Helper to initialize or load files from cloud or backup local disk
 async function loadJSON<T>(filePath: string, defaultVal: T): Promise<T> {
+  try {
+    if (filePath === CONFIG_FILE) {
+      const docRef = doc(db, "configs", "global");
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        return docSnap.data() as T;
+      }
+      try {
+        const local = await fs.readFile(filePath, "utf-8");
+        const parsed = JSON.parse(local) as T;
+        await setDoc(docRef, parsed);
+        return parsed;
+      } catch (e) {
+        await setDoc(docRef, defaultVal as any);
+        return defaultVal;
+      }
+    } else if (filePath === DATA_FILE) {
+      const querySnapshot = await getDocs(collection(db, "responses"));
+      if (!querySnapshot.empty) {
+        const list: any[] = [];
+        querySnapshot.forEach((doc) => {
+          list.push(doc.data());
+        });
+        return list as T;
+      }
+      try {
+        const local = await fs.readFile(filePath, "utf-8");
+        const parsed = JSON.parse(local) as T;
+        for (const item of (parsed as any[])) {
+          if (item && item.id) {
+            await setDoc(doc(db, "responses", item.id), item);
+          }
+        }
+        return parsed;
+      } catch (e) {
+        return defaultVal;
+      }
+    }
+  } catch (err) {
+    console.error("Firestore read fallback to local JSON file:", err);
+  }
+
   try {
     const data = await fs.readFile(filePath, "utf-8");
     return JSON.parse(data) as T;
   } catch (error) {
-    await fs.writeFile(filePath, JSON.stringify(defaultVal, null, 2));
     return defaultVal;
   }
 }
 
 async function saveJSON<T>(filePath: string, val: T): Promise<void> {
-  await fs.writeFile(filePath, JSON.stringify(val, null, 2));
+  try {
+    if (filePath === CONFIG_FILE) {
+      const docRef = doc(db, "configs", "global");
+      await setDoc(docRef, val as any);
+    } else if (filePath === DATA_FILE) {
+      if (Array.isArray(val)) {
+        for (const item of val) {
+          if (item && item.id) {
+            await setDoc(doc(db, "responses", item.id), item);
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Firestore save error:", err);
+  }
+
+  try {
+    await fs.writeFile(filePath, JSON.stringify(val, null, 2));
+  } catch (error) {
+    console.error("Local disk backup save failed:", error);
+  }
 }
 
 // Format a single response into Google Sheets row values

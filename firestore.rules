@@ -1,0 +1,9 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Open access for anonymous study habit survey app
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

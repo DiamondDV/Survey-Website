@@ -1,18 +1,11 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User, signOut } from 'firebase/auth';
-
-const firebaseConfig = {
-  projectId: "gen-lang-client-0397154899",
-  appId: "1:849548994571:web:d5cb0fb805c822b4beff0e",
-  apiKey: "AIzaSyCMSk-VNBPy4DxsQlEwJdyLqDWJEijfcFs",
-  authDomain: "gen-lang-client-0397154899.firebaseapp.com",
-  storageBucket: "gen-lang-client-0397154899.firebasestorage.app",
-  messagingSenderId: "849548994571",
-  measurementId: ""
-};
+import { getFirestore } from 'firebase/firestore';
+import firebaseConfig from '../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
 const provider = new GoogleAuthProvider();
 provider.addScope('https://www.googleapis.com/auth/spreadsheets');

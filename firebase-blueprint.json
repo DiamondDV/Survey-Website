@@ -1,0 +1,36 @@
+{
+  "entities": {
+    "SurveyConfig": {
+      "title": "SurveyConfig",
+      "description": "Google Sheets dynamic config",
+      "type": "object",
+      "properties": {
+        "spreadsheetId": { "type": "string" },
+        "spreadsheetUrl": { "type": "string" },
+        "adminAccessToken": { "type": "string" },
+        "adminEmail": { "type": "string" }
+      }
+    },
+    "SurveyResponse": {
+      "title": "SurveyResponse",
+      "description": "Survey submission",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "answers": { "type": "object" },
+        "synced": { "type": "boolean" }
+      }
+    }
+  },
+  "firestore": {
+    "/configs/{configId}": {
+      "schema": "SurveyConfig",
+      "description": "Global admin configuration"
+    },
+    "/responses/{responseId}": {
+      "schema": "SurveyResponse",
+      "description": "Individual survey responses"
+    }
+  }
+}
