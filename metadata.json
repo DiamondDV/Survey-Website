@@ -1,0 +1,6 @@
+{
+  "name": "Study Habits Survey",
+  "description": "A clean, elegant, single-view survey website that tracks student study habits and automatically saves all responses to a dynamic Google Sheet.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
