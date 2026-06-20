@@ -258,7 +258,17 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
       });
       const data = await res.json();
       if (data.success) {
-        alert(`Successfully synced ${data.syncedCount} response(s) to Google Sheets!`);
+        if (data.pendingCount > 0) {
+          let errorMsg = `Synced ${data.syncedCount} new response(s), but ${data.pendingCount} response(s) could not be synced.`;
+          if (data.authError) {
+            errorMsg += "\n\nError: Google Sheets returned an Authentication/Permission error. Please click 'Auth Google Sheets' again to sign in and renew authorization.";
+          } else if (data.lastError) {
+            errorMsg += `\n\nGoogle Sheets Error detail: ${data.lastError}`;
+          }
+          alert(errorMsg);
+        } else {
+          alert(`Successfully synced ${data.syncedCount} response(s) to Google Sheets! All survey responses are fully up-to-date.`);
+        }
         await fetchConfigAndResponses();
       } else {
         alert(data.error || "Failed to trigger sync.");

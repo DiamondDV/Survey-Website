@@ -101,7 +101,11 @@ async function saveJSON<T>(filePath: string, val: T): Promise<void> {
       if (Array.isArray(val)) {
         for (const item of val) {
           if (item && item.id) {
-            await setDoc(doc(db, "responses", item.id), item);
+            try {
+              await setDoc(doc(db, "responses", item.id), item);
+            } catch (innerErr) {
+              console.error(`Firestore save error for response ${item.id}:`, innerErr);
+            }
           }
         }
       }
@@ -119,23 +123,31 @@ async function saveJSON<T>(filePath: string, val: T): Promise<void> {
 
 // Format a single response into Google Sheets row values
 function responseToRow(res: SurveyResponse): any[] {
+  const answers = res.answers || {} as any;
+  const q5Val = Array.isArray(answers.q5) ? answers.q5.join(", ") : (answers.q5 || "");
   return [
-    res.timestamp,
-    res.answers.q1,
-    res.answers.q2,
-    res.answers.q3,
-    res.answers.q4,
-    res.answers.q5.join(", "),
-    res.answers.q6,
-    res.answers.q7,
-    res.answers.q8,
-    res.answers.q9,
-    res.answers.q10
+    res.timestamp || new Date().toLocaleString(),
+    answers.q1 || "",
+    answers.q2 || "",
+    answers.q3 || "",
+    answers.q4 || "",
+    q5Val,
+    answers.q6 || "",
+    answers.q7 || "",
+    answers.q8 || "",
+    answers.q9 || "",
+    answers.q10 || ""
   ];
 }
 
+interface AppendResult {
+  success: boolean;
+  isAuthError?: boolean;
+  errorText?: string;
+}
+
 // Append rows directly via Google Sheets HTTP API
-async function appendToGoogleSheet(spreadsheetId: string, accessToken: string, response: SurveyResponse): Promise<boolean> {
+async function appendToGoogleSheet(spreadsheetId: string, accessToken: string, response: SurveyResponse): Promise<AppendResult> {
   try {
     const range = "Sheet1!A:K";
     const values = [responseToRow(response)];
@@ -156,12 +168,13 @@ async function appendToGoogleSheet(spreadsheetId: string, accessToken: string, r
     if (!res.ok) {
       const errorText = await res.text();
       console.error("Google Sheets append API error:", errorText);
-      return false;
+      const isAuthError = res.status === 401 || res.status === 403;
+      return { success: false, isAuthError, errorText };
     }
-    return true;
-  } catch (err) {
+    return { success: true };
+  } catch (err: any) {
     console.error("Failed appending to Google Sheet:", err);
-    return false;
+    return { success: false, errorText: err.message || String(err) };
   }
 }
 
@@ -276,8 +289,8 @@ async function startServer() {
 
     // Try to sync instantly with Google Sheets if configured and token is present
     if (config.spreadsheetId && config.adminAccessToken) {
-      const isSynced = await appendToGoogleSheet(config.spreadsheetId, config.adminAccessToken, newResponse);
-      newResponse.synced = isSynced;
+      const appendResult = await appendToGoogleSheet(config.spreadsheetId, config.adminAccessToken, newResponse);
+      newResponse.synced = appendResult.success;
     }
 
     responses.push(newResponse);
@@ -310,16 +323,25 @@ async function startServer() {
 
     const responses = await loadJSON<SurveyResponse[]>(DATA_FILE, []);
     let syncCount = 0;
+    let authErrorOccurred = false;
+    let lastErrorDetails = "";
 
     // Set up headers once to ensure columns exist
     await setupGoogleSheetColumns(sheetId, currentToken);
 
     for (const resp of responses) {
       if (!resp.synced) {
-        const ok = await appendToGoogleSheet(sheetId, currentToken, resp);
-        if (ok) {
+        const appendResult = await appendToGoogleSheet(sheetId, currentToken, resp);
+        if (appendResult.success) {
           resp.synced = true;
           syncCount++;
+        } else {
+          if (appendResult.isAuthError) {
+            authErrorOccurred = true;
+          }
+          if (appendResult.errorText) {
+            lastErrorDetails = appendResult.errorText;
+          }
         }
       }
     }
@@ -328,7 +350,16 @@ async function startServer() {
       await saveJSON(DATA_FILE, responses);
     }
 
-    res.json({ success: true, syncedCount: syncCount, totalCount: responses.length });
+    const pendingCount = responses.filter(r => !r.synced).length;
+
+    res.json({ 
+      success: true, 
+      syncedCount: syncCount, 
+      totalCount: responses.length,
+      pendingCount,
+      authError: authErrorOccurred,
+      lastError: lastErrorDetails
+    });
   });
 
   // POST: Clear all responses (Reset stats for testing)
