@@ -148,71 +148,96 @@ interface AppendResult {
 
 // Append rows directly via Google Sheets HTTP API
 async function appendToGoogleSheet(spreadsheetId: string, accessToken: string, response: SurveyResponse): Promise<AppendResult> {
-  try {
-    const range = "Sheet1!A:K";
-    const values = [responseToRow(response)];
-    
-    // Check if the sheets exists or append
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}:append?valueInputOption=USER_ENTERED`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${accessToken}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        values
-      })
-    });
+  const values = [responseToRow(response)];
 
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error("Google Sheets append API error:", errorText);
-      const isAuthError = res.status === 401 || res.status === 403;
-      return { success: false, isAuthError, errorText };
+  async function tryAppend(range: string): Promise<AppendResult> {
+    try {
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}:append?valueInputOption=USER_ENTERED`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${accessToken}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          values
+        })
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error(`Google Sheets append API error for range ${range}:`, errorText);
+        const isAuthError = res.status === 401 || res.status === 403;
+        return { success: false, isAuthError, errorText };
+      }
+      return { success: true };
+    } catch (err: any) {
+      console.error(`Failed appending to Google Sheet for range ${range}:`, err);
+      return { success: false, errorText: err.message || String(err) };
     }
-    return { success: true };
-  } catch (err: any) {
-    console.error("Failed appending to Google Sheet:", err);
-    return { success: false, errorText: err.message || String(err) };
   }
+
+  // Try appending to Sheet1!A:K first
+  let result = await tryAppend("Sheet1!A:K");
+  if (!result.success && !result.isAuthError) {
+    // If it is a bad request/range error (e.g. Sheet1 doesn't exist due to localized naming),
+    // fallback to default first sheet using "A:K"
+    const fallbackResult = await tryAppend("A:K");
+    if (fallbackResult.success) {
+      return fallbackResult;
+    }
+  }
+  return result;
 }
 
 // Make sure Sheet columns are formatted on setup
 async function setupGoogleSheetColumns(spreadsheetId: string, accessToken: string): Promise<boolean> {
-  try {
-    const range = "Sheet1!A1:K1";
-    const headers = [
-      "Timestamp",
-      "Q1: Grade",
-      "Q2: Study Hours/Week",
-      "Q3: Delay Frequency",
-      "Q4: Decision Difficulty",
-      "Q5: Distractions/Prevents Starting",
-      "Q6: Social Media Overwhelm",
-      "Q7: Overwhelm Frequency",
-      "Q8: Smart Planner App Usefulness",
-      "Q9: App Adoption Willingness",
-      "Q10: Biggest Challenge"
-    ];
+  const headers = [
+    "Timestamp",
+    "Q1: Grade",
+    "Q2: Study Hours/Week",
+    "Q3: Delay Frequency",
+    "Q4: Decision Difficulty",
+    "Q5: Distractions/Prevents Starting",
+    "Q6: Social Media Overwhelm",
+    "Q7: Overwhelm Frequency",
+    "Q8: Smart Planner App Usefulness",
+    "Q9: App Adoption Willingness",
+    "Q10: Biggest Challenge"
+  ];
 
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}?valueInputOption=USER_ENTERED`;
-    const res = await fetch(url, {
-      method: "PUT",
-      headers: {
-        "Authorization": `Bearer ${accessToken}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        values: [headers]
-      })
-    });
+  async function trySetup(range: string): Promise<boolean> {
+    try {
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}?valueInputOption=USER_ENTERED`;
+      const res = await fetch(url, {
+        method: "PUT",
+        headers: {
+          "Authorization": `Bearer ${accessToken}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          values: [headers]
+        })
+      });
 
-    return res.ok;
-  } catch (err) {
-    console.error("Failed updating Google Sheet headers:", err);
-    return false;
+      if (!res.ok) {
+        const errText = await res.text();
+        console.warn(`Failed setup columns on range ${range}:`, errText);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.error(`Failed setup Google Sheet headers on range ${range}:`, err);
+      return false;
+    }
   }
+
+  let ok = await trySetup("Sheet1!A1:K1");
+  if (!ok) {
+    // Fall back to first sheet default range
+    ok = await trySetup("A1:K1");
+  }
+  return ok;
 }
 
 async function startServer() {
