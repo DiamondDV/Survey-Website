@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Clock, ChevronLeft, Check, CheckSquare, Square, ThumbsUp, Sparkles } from "lucide-react";
+import { Clock, ChevronLeft, Check, CheckSquare, Square, ThumbsUp, Sparkles, ExternalLink } from "lucide-react";
 import { Question, SURVEY_QUESTIONS, SurveyAnswers } from "../types";
 
 interface SurveyWizardProps {
@@ -24,6 +24,20 @@ export default function SurveyWizard({ onSubmit, onAdminClick }: SurveyWizardPro
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Detect platform on load based on URL query param
+  const [detectedPlatform] = useState<"surveyswap" | "surveycircle" | "all">(() => {
+    const search = window.location.search.toLowerCase();
+    if (search.includes("surveycircle")) return "surveycircle";
+    if (search.includes("surveyswap")) return "surveyswap";
+    return "all";
+  });
+
+  const [activeTab, setActiveTab] = useState<"surveyswap" | "surveycircle">(() => {
+    const search = window.location.search.toLowerCase();
+    if (search.includes("surveycircle")) return "surveycircle";
+    return "surveyswap";
+  });
 
   const currentQuestionIndex = step - 1;
   const question: Question | undefined = SURVEY_QUESTIONS[currentQuestionIndex];
@@ -178,6 +192,21 @@ export default function SurveyWizard({ onSubmit, onAdminClick }: SurveyWizardPro
               <span>Takes 1 minute 30 seconds</span>
             </div>
           </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.4, delay: 0.3 }}
+            className="mt-8 pt-5 border-t border-neutral-200 w-full max-w-sm text-left space-y-2.5 text-[11px] text-neutral-500 leading-normal"
+            id="survey-welcome-footer-notices"
+          >
+            <p>
+              <span className="font-semibold text-neutral-700">PS:</span> SurveyCircle users receive points for their participation, which can be used to recruit free survey participants at <a href="https://www.surveycircle.com" target="_blank" rel="noopener noreferrer" className="font-medium text-neutral-700 hover:underline">SurveyCircle.com</a>
+            </p>
+            <p>
+              <span className="font-semibold text-neutral-700">P.S:</span> This survey contains Karma to get free survey responses at <a href="https://surveyswap.io" target="_blank" rel="noopener noreferrer" className="font-medium text-neutral-700 hover:underline">SurveySwap.io</a>
+            </p>
+          </motion.div>
         </div>
       </div>
     );
@@ -187,37 +216,102 @@ export default function SurveyWizard({ onSubmit, onAdminClick }: SurveyWizardPro
   if (step === 11) {
     return (
       <div className="flex flex-col items-center justify-between min-h-[580px] py-12 px-6 text-center" id="survey-complete">
-        <div className="flex-1 flex flex-col justify-center items-center max-w-md">
+        <div className="flex-1 flex flex-col justify-center items-center w-full max-w-md">
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
-            className="w-16 h-16 bg-emerald-100 text-emerald-800 rounded-full flex items-center justify-center mb-6 shadow-sm"
+            className="w-14 h-14 bg-emerald-100 text-emerald-800 rounded-full flex items-center justify-center mb-5 shadow-sm"
           >
-            <Check className="w-8 h-8 stroke-[2.5]" />
+            <Check className="w-7 h-7 stroke-[2.5]" />
           </motion.div>
-          <h1 className="text-2xl font-serif font-semibold tracking-tight text-neutral-900 mb-4">
+          <h1 className="text-2xl font-sans font-semibold tracking-tight text-neutral-900 mb-3">
             Thanks For Your Time!
           </h1>
-          <p className="text-neutral-600 text-sm leading-relaxed mb-6">
-            The following code gives you Karma that can be used to get free research participants at SurveySwap.io.
-          </p>
 
-          <div className="bg-neutral-100 border border-neutral-200 rounded-xl p-4 w-full text-center space-y-3 shadow-inner">
-            <a
-              href="https://surveyswap.io/sr/GZNV-B4ME-6LJO"
-              target="_blank"
-              rel="noreferrer"
-              className="text-neutral-950 font-medium hover:underline flex items-center justify-center gap-1.5 text-sm"
+          {/* Platform Tab Switcher */}
+          <div className="flex bg-neutral-200/50 p-1.5 rounded-xl gap-1 w-full mb-6 max-w-xs border border-neutral-300">
+            <button
+              onClick={() => setActiveTab("surveyswap")}
+              className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all duration-200 ${
+                activeTab === "surveyswap"
+                  ? "bg-neutral-900 text-[#F4EFEB] shadow-xs"
+                  : "text-neutral-500 hover:text-neutral-800"
+              }`}
             >
-              Go to: <span className="text-blue-600 font-semibold break-all">https://surveyswap.io/sr/GZNV-B4ME-6LJO</span>
-            </a>
-            <div className="h-[1px] bg-neutral-200 w-full" />
-            <div className="text-xs text-neutral-500">
-              Or, alternatively, enter the code manually: {" "}
-              <span className="font-mono bg-neutral-200 text-neutral-800 px-2 py-0.5 rounded font-bold tracking-wider">
-                GZNV-B4ME-6LJO
-              </span>
-            </div>
+              SurveySwap
+            </button>
+            <button
+              onClick={() => setActiveTab("surveycircle")}
+              className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all duration-200 ${
+                activeTab === "surveycircle"
+                  ? "bg-neutral-900 text-[#F4EFEB] shadow-xs"
+                  : "text-neutral-500 hover:text-neutral-800"
+              }`}
+            >
+              SurveyCircle
+            </button>
+          </div>
+
+          <div className="w-full animate-fadeIn transition-opacity duration-300">
+            {activeTab === "surveycircle" ? (
+              <div className="space-y-4 text-center">
+                <p className="text-neutral-600 text-xs sm:text-sm leading-relaxed mb-1">
+                  Redeem the following Survey Code at <a href="https://www.surveycircle.com" target="_blank" rel="noreferrer" className="text-neutral-950 font-medium hover:underline">https://www.surveycircle.com</a> and get free survey participants through SurveyCircle. The Survey Code is: <span className="font-semibold text-neutral-900 break-all">C2MB-3K5W-G5FK-87K9</span>
+                </p>
+
+                <div className="bg-neutral-100 border border-neutral-250 rounded-xl p-4 w-full text-center space-y-3 shadow-inner">
+                  <div>
+                    <div className="text-[10px] text-neutral-400 uppercase tracking-wider font-semibold mb-1">Copy Code</div>
+                    <span className="font-mono bg-neutral-200 text-neutral-850 px-3 py-1.5 rounded-lg text-sm sm:text-base font-bold tracking-wider inline-block select-all">
+                      C2MB-3K5W-G5FK-87K9
+                    </span>
+                  </div>
+                  
+                  <div className="h-[1px] bg-neutral-200 w-full" />
+                  
+                  <div>
+                    <a
+                      href="https://www.surveycircle.com/C2MB-3K5W-G5FK-87K9/"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs text-[#F4EFEB] bg-[#2B2A27] hover:bg-neutral-800 hover:shadow-xs transition duration-150 px-4 py-2 font-medium rounded-lg"
+                    >
+                      <span>Redeem Survey Code with one click</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4 text-center">
+                <p className="text-neutral-600 text-xs sm:text-sm leading-relaxed mb-1">
+                  The following code gives you Karma that can be used to get free research participants at <a href="https://surveyswap.io" target="_blank" rel="noreferrer" className="text-neutral-950 font-medium hover:underline">SurveySwap.io</a>.
+                </p>
+
+                <div className="bg-neutral-100 border border-neutral-250 rounded-xl p-4 w-full text-center space-y-3 shadow-inner">
+                  <div>
+                    <div className="text-[10px] text-neutral-400 uppercase tracking-wider font-semibold mb-1">Copy Code</div>
+                    <span className="font-mono bg-neutral-200 text-neutral-850 px-3 py-1.5 rounded-lg text-sm sm:text-base font-bold tracking-wider inline-block select-all">
+                      GZNV-B4ME-6LJO
+                    </span>
+                  </div>
+
+                  <div className="h-[1px] bg-neutral-200 w-full" />
+
+                  <div>
+                    <a
+                      href="https://surveyswap.io/sr/GZNV-B4ME-6LJO"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs text-[#F4EFEB] bg-[#2B2A27] hover:bg-neutral-800 hover:shadow-xs transition duration-150 px-4 py-2 font-medium rounded-lg"
+                    >
+                      <span>Go to: https://surveyswap.io/sr/GZNV-B4ME-6LJO</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
