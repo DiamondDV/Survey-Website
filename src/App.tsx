@@ -209,6 +209,22 @@ export default function App() {
           © {new Date().getFullYear()} Survey Results Saved Securely
         </span>
       </footer>
+
+      {/* Subtle unnoticeable developer trigger to open Admin Gate directly */}
+      {!isAdminMode && (
+        <button
+          onClick={() => {
+            setPinInput("");
+            setPinError(false);
+            setShowPinGate(true);
+          }}
+          className="absolute bottom-3 right-3 p-1.5 rounded-full text-neutral-400 hover:text-neutral-700 opacity-15 hover:opacity-90 transition-all duration-200 cursor-pointer focus:outline-hidden"
+          title="Creator Admin Panel"
+          id="hidden-admin-shortcut"
+        >
+          <Lock className="w-3 h-3" />
+        </button>
+      )}
     </div>
   );
 }

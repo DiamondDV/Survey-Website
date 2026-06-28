@@ -247,6 +247,71 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
     setIsCreatingSheet(false);
   };
 
+  const handleExportCSV = () => {
+    if (responses.length === 0) {
+      alert("No survey responses are available to export yet. Please submit some responses first!");
+      return;
+    }
+
+    const headers = [
+      "Timestamp",
+      "Q1: Grade",
+      "Q2: Study Hours/Week",
+      "Q3: Delay Frequency",
+      "Q4: Decision Difficulty",
+      "Q5: Distractions/Prevents Starting",
+      "Q6: Social Media Overwhelm",
+      "Q7: Overwhelm Frequency",
+      "Q8: Smart Planner App Usefulness",
+      "Q9: App Adoption Willingness",
+      "Q10: Biggest Challenge"
+    ];
+
+    const escapeCSV = (val: any) => {
+      if (val === null || val === undefined) return '""';
+      let s = String(val);
+      s = s.replace(/"/g, '""');
+      if (s.includes(",") || s.includes("\n") || s.includes('"')) {
+        return `"${s}"`;
+      }
+      return s;
+    };
+
+    const csvRows = [
+      headers.map(escapeCSV).join(",")
+    ];
+
+    responses.forEach(res => {
+      const answers = res.answers || {} as any;
+      const q5Val = Array.isArray(answers.q5) ? answers.q5.join(", ") : (answers.q5 || "");
+      const row = [
+        res.timestamp || new Date(res.createdAt || Date.now()).toLocaleString(),
+        answers.q1 || "",
+        answers.q2 || "",
+        answers.q3 || "",
+        answers.q4 || "",
+        q5Val,
+        answers.q6 || "",
+        answers.q7 || "",
+        answers.q8 || "",
+        answers.q9 || "",
+        answers.q10 || ""
+      ];
+      csvRows.push(row.map(escapeCSV).join(","));
+    });
+
+    const csvContent = "\uFEFF" + csvRows.join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `study_habits_survey_responses_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const handleManualSync = async () => {
     setIsSyncing(true);
     try {
@@ -406,6 +471,15 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
             title="Refresh local data"
           >
             <RefreshCw className="w-4 h-4" />
+          </button>
+
+          <button
+            onClick={handleExportCSV}
+            className="px-3 py-2 bg-white border border-emerald-200 hover:border-emerald-300 text-emerald-700 hover:bg-emerald-50 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition shadow-2xs"
+            title="Download responses as a Google Sheets compatible CSV"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+            <span>Export CSV</span>
           </button>
 
           <button
@@ -668,6 +742,19 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
                     <li>Row headings will be automatically configured for you immediately.</li>
                     <li>All subsequent survey submissions will automatically sync onto your sheet!</li>
                   </ol>
+                </div>
+
+                {/* Troubleshooting section */}
+                <div className="bg-amber-50/50 border border-amber-200 rounded-xl p-4 text-xs text-amber-800 space-y-2">
+                  <h4 className="font-bold uppercase tracking-widest text-[10px] flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 text-amber-600" /> Troubleshooting Auth/Popup Errors
+                  </h4>
+                  <p className="text-[11px] leading-relaxed">
+                    If clicking <strong className="text-amber-950">Auth Google Sheets</strong> opens a popup that instantly disappears or returns a <code>"Google Sign-In failed"</code> / <code>"auth/unauthorized-domain"</code> error, your active web domain is restricted.
+                  </p>
+                  <p className="font-medium text-[11px] leading-relaxed">
+                    <strong>To fix:</strong> Copy your current website domain (e.g. <code className="bg-amber-100/70 px-1 rounded">survey-website-g0jn.onrender.com</code> or whichever one is in your browser's address bar) and add it to the <strong>Authorized Domains</strong> list in the developer's <strong>Google Firebase Console &rarr; Authentication &rarr; Settings &rarr; Authorized Domains</strong>.
+                  </p>
                 </div>
 
                 {/* Dangerous buttons area */}
